@@ -23,16 +23,16 @@
 </head>
 <body>
   <svg id="map" aria-label="Mapa-múndi interativo"></svg>
-  <div id="tooltip"></div>
+  <div id="tooltip" lang="en"></div>
   <p id="status" role="status">Carregando mapa…</p>
   <noscript>Ative o JavaScript para visualizar o mapa.</noscript>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0"></script>
   <script>
     const SELECTED_COUNTRIES = {
-      76: "Brasil", 170: "Colômbia", 152: "Chile", 484: "México", 604: "Peru",
-      840: "Estados Unidos", 376: "Israel", 620: "Portugal", 724: "Espanha",
-      300: "Grécia", 380: "Itália"
+      76: "Brazil", 170: "Colombia", 152: "Chile", 484: "Mexico", 604: "Peru",
+      840: "United States", 376: "Israel", 620: "Portugal", 724: "Spain",
+      300: "Greece", 380: "Italy"
     };
     const PIN_COUNTRIES = [376, 620, 300];
     const status = document.querySelector("#status");

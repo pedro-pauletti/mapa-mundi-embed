@@ -1,6 +1,6 @@
 # Mapa-Múndi Interativo
 
-Mapa estático em D3.js com 11 países destacados. Passe o mouse para ver o nome; clique em um destaque para aproximar e clique novamente ou no fundo branco para voltar à visão geral.
+Mapa estático em D3.js com 11 países destacados. Passe o mouse para ver o nome em inglês; clique em um destaque para aproximar e clique novamente ou no fundo branco para voltar à visão geral.
 
 ## Incorporar no SharePoint
 
