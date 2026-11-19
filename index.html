@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa-Múndi Interativo</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #fff; font-family: system-ui, sans-serif; }
+    svg { width: 100%; height: 100%; display: block; cursor: grab; }
+    svg:active { cursor: grabbing; }
+    .country { transition: fill .2s ease, stroke .2s ease; }
+    .country.default:hover { fill: #bfdbfe; }
+    .country.selected, .pin-group { cursor: pointer; }
+    .country.selected:hover, .country.selected.active { fill: #0284c7; stroke: #0c4a6e; }
+    #tooltip {
+      position: fixed; pointer-events: none; opacity: 0; background: #0f172a; color: #fff;
+      padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500;
+      box-shadow: 0 4px 12px #0f172a33; transition: opacity .15s ease; white-space: nowrap;
+    }
+    #status { position: absolute; inset: 0; margin: 0; text-align: center; padding: 2rem; pointer-events: none; color: #0f172a; }
+  </style>
+</head>
+<body>
+  <svg id="map" aria-label="Mapa-múndi interativo"></svg>
+  <div id="tooltip"></div>
+  <p id="status" role="status">Carregando mapa…</p>
+  <noscript>Ative o JavaScript para visualizar o mapa.</noscript>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0"></script>
+  <script>
+    const SELECTED_COUNTRIES = {
+      76: "Brasil", 170: "Colômbia", 152: "Chile", 484: "México", 604: "Peru",
+      840: "Estados Unidos", 376: "Israel", 620: "Portugal", 724: "Espanha",
+      300: "Grécia", 380: "Itália"
+    };
+    const PIN_COUNTRIES = [376, 620, 300];
+    const status = document.querySelector("#status");
+
+    async function loadMap() {
+      const svg = d3.select("#map");
+      const tooltip = d3.select("#tooltip");
+      const width = window.innerWidth || 960;
+      const height = window.innerHeight || 550;
+      svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+      const g = svg.append("g");
+      const countriesLayer = g.append("g");
+      const pinsLayer = g.append("g");
+      const projection = d3.geoNaturalEarth1()
+        .scale(Math.min(width / 5.4, height / 2.7))
+        .translate([width / 2, height / 1.88]);
+      const path = d3.geoPath(projection);
+      const countryName = (d) => SELECTED_COUNTRIES[Number(d.id)];
+      const strokeWidth = (d) => countryName(d) ? 1.1 : 0.6;
+      let activeId = null;
+
+      const zoom = d3.zoom().scaleExtent([1, 8]).on("zoom", ({ transform }) => {
+        g.attr("transform", transform);
+        countriesLayer.selectAll("path").attr("stroke-width", (d) => strokeWidth(d) / transform.k);
+        pinsLayer.selectAll(".pin-group")
+          .attr("transform", (d) => `${pinPosition(d)} scale(${1 / transform.k})`);
+      });
+      svg.call(zoom).on("click", (event) => {
+        if (event.target === svg.node()) reset();
+      });
+
+      function reset() {
+        activeId = null;
+        countriesLayer.selectAll("path").classed("active", false);
+        svg.transition().duration(650).call(zoom.transform, d3.zoomIdentity);
+      }
+
+      function focusCountry(event, d) {
+        if (!countryName(d)) return;
+        event.stopPropagation();
+        const id = Number(d.id);
+        if (activeId === id) {
+          reset();
+          return;
+        }
+        activeId = id;
+        countriesLayer.selectAll("path").classed("active", (p) => Number(p.id) === id);
+        const [[x0, y0], [x1, y1]] = path.bounds(d);
+        const scale = Math.max(1.8, Math.min(6.5,
+          0.55 / Math.max((x1 - x0) / width, (y1 - y0) / height)));
+        const x = width / 2 - scale * (x0 + x1) / 2;
+        const y = height / 2 - scale * (y0 + y1) / 2;
+        svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+      }
+
+      function pinPosition(d) {
+        const [x, y] = path.centroid(d);
+        return `translate(${x}, ${y})`;
+      }
+
+      function showTooltip(event, d) {
+        const name = countryName(d);
+        if (!name) return hideTooltip();
+        tooltip.text(name).style("opacity", 1);
+        const box = tooltip.node().getBoundingClientRect();
+        tooltip.style("left", `${Math.max(0, Math.min(event.clientX + 12, window.innerWidth - box.width - 4))}px`)
+          .style("top", `${Math.max(0, event.clientY - 28)}px`);
+      }
+
+      function hideTooltip() {
+        tooltip.style("opacity", 0);
+      }
+
+      const world = await d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json")
+        .catch(() => d3.json("https://unpkg.com/world-atlas@2.0.2/countries-110m.json"));
+      const countries = topojson.feature(world, world.objects.countries).features
+        .filter((d) => Number(d.id) !== 10);
+
+      countriesLayer.selectAll("path").data(countries).join("path")
+        .attr("d", path)
+        .attr("class", (d) => countryName(d) ? "country selected" : "country default")
+        .attr("fill", (d) => countryName(d) ? "#1d4ed8" : "#dbeafe")
+        .attr("stroke", (d) => countryName(d) ? "#1e3a8a" : "#93c5fd")
+        .attr("stroke-width", strokeWidth)
+        .on("mousemove", showTooltip)
+        .on("mouseleave", hideTooltip)
+        .on("click", focusCountry);
+
+      const pins = pinsLayer.selectAll(".pin-group")
+        .data(countries.filter((d) => PIN_COUNTRIES.includes(Number(d.id)))).join("g")
+        .attr("class", "pin-group")
+        .attr("transform", pinPosition)
+        .on("mousemove", showTooltip)
+        .on("mouseleave", hideTooltip)
+        .on("click", focusCountry);
+      pins.append("circle").attr("r", 7).attr("fill", "#2563eb").attr("opacity", 0.28);
+      pins.append("circle").attr("r", 3.5).attr("fill", "#1d4ed8").attr("stroke", "#fff").attr("stroke-width", 1.2);
+      status.hidden = true;
+    }
+
+    loadMap().catch((error) => {
+      status.textContent = "Não foi possível carregar o mapa. Atualize a página para tentar novamente.";
+      console.error("Erro ao carregar o mapa:", error);
+    });
+  </script>
+</body>
+</html>
